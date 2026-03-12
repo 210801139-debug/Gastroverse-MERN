@@ -33,7 +33,7 @@ Implemented controls:
 - Warning/guardrails for weak JWT secrets.
 - `helmet` enabled, `x-powered-by` disabled.
 - CORS allowlist controlled by `CORS_ORIGIN`.
-- Request body size limit (`10kb`) and global API rate limit.
+- Request body size limit (`16mb`) and global API rate limit.
 
 Where:
 
