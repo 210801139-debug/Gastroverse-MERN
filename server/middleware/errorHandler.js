@@ -1,0 +1,45 @@
+const { logSecurityEvent } = require("../utils/securityLogger");
+
+const notFound = (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.originalUrl}`,
+  });
+};
+
+const errorHandler = (err, req, res, _next) => {
+  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let message = err.message || "Internal Server Error";
+
+  if (err.name === "CastError") {
+    statusCode = 400;
+    message = "Invalid resource identifier";
+  }
+
+  if (err.name === "ValidationError") {
+    statusCode = 400;
+    message = Object.values(err.errors)
+      .map((value) => value.message)
+      .join(", ");
+  }
+
+  if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
+    statusCode = 401;
+    message = "Not authorized";
+  }
+
+  if (statusCode >= 500) {
+    logSecurityEvent("server_error", req, {
+      statusCode,
+      errorName: err.name,
+    });
+  }
+
+  res.status(statusCode).json({
+    success: false,
+    message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+};
+
+module.exports = { notFound, errorHandler };

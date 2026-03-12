@@ -2,11 +2,16 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const mongoSanitize = require("express-mongo-sanitize");
-const rateLimit = require("express-rate-limit");
+const path = require("path");
 const dotenv = require("dotenv");
 const connectDB = require("./config/db");
+const { apiLimiter } = require("./middleware/rateLimiters");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, ".env") });
+if (!process.env.MONGO_URI) {
+  dotenv.config({ path: path.resolve(__dirname, "../.env") });
+}
 
 const authRoutes = require("./routes/auth");
 const restaurantRoutes = require("./routes/restaurant");
@@ -16,20 +21,57 @@ const reservationRoutes = require("./routes/reservation");
 
 const app = express();
 
+const validateSecurityConfig = () => {
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI is required");
+  }
+
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is required");
+  }
+
+  const weakSecret =
+    process.env.JWT_SECRET === "your_jwt_secret_here" ||
+    process.env.JWT_SECRET.length < 32;
+
+  if (weakSecret && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET is too weak for production. Use a random secret >= 32 chars",
+    );
+  }
+
+  if (weakSecret) {
+    console.warn(
+      "[SECURITY_WARNING] JWT_SECRET appears weak. Replace with random >= 32 chars",
+    );
+  }
+};
+
+validateSecurityConfig();
+
 // Security middleware
 app.use(helmet());
 app.use(mongoSanitize());
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+app.use(apiLimiter);
+app.disable("x-powered-by");
 
 // Core middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS policy blocked this origin"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  }),
+);
 app.use(express.json({ limit: "10kb" }));
 
 // Routes
@@ -44,14 +86,8 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Global error handler
-app.use((err, _req, res, _next) => {
-  console.error(err.stack);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || "Internal Server Error",
-  });
-});
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
@@ -59,4 +95,13 @@ connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error.message);
+  process.exit(1);
 });

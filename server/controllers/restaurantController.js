@@ -1,4 +1,15 @@
+const mongoose = require("mongoose");
 const Restaurant = require("../models/Restaurant");
+
+const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+
+const pick = (source, allowed) =>
+  allowed.reduce((acc, key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      acc[key] = source[key];
+    }
+    return acc;
+  }, {});
 
 exports.getRestaurants = async (req, res, next) => {
   try {
@@ -14,6 +25,12 @@ exports.getRestaurants = async (req, res, next) => {
 
 exports.getRestaurant = async (req, res, next) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid restaurant id" });
+    }
+
     const restaurant = await Restaurant.findById(req.params.id).populate(
       "owner",
       "name email",
@@ -31,8 +48,19 @@ exports.getRestaurant = async (req, res, next) => {
 
 exports.createRestaurant = async (req, res, next) => {
   try {
-    req.body.owner = req.user.id;
-    const restaurant = await Restaurant.create(req.body);
+    const allowedFields = [
+      "name",
+      "description",
+      "cuisine",
+      "address",
+      "phone",
+      "image",
+      "isOpen",
+    ];
+    const payload = pick(req.body, allowedFields);
+    payload.owner = req.user.id;
+
+    const restaurant = await Restaurant.create(payload);
     res.status(201).json({ success: true, data: restaurant });
   } catch (error) {
     next(error);
@@ -41,6 +69,12 @@ exports.createRestaurant = async (req, res, next) => {
 
 exports.updateRestaurant = async (req, res, next) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid restaurant id" });
+    }
+
     const restaurant = await Restaurant.findById(req.params.id);
     if (!restaurant) {
       return res
@@ -53,9 +87,18 @@ exports.updateRestaurant = async (req, res, next) => {
         .json({ success: false, message: "Not authorized" });
     }
 
+    const allowedFields = [
+      "name",
+      "description",
+      "cuisine",
+      "address",
+      "phone",
+      "image",
+      "isOpen",
+    ];
     const updated = await Restaurant.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      pick(req.body, allowedFields),
       {
         new: true,
         runValidators: true,
@@ -69,6 +112,12 @@ exports.updateRestaurant = async (req, res, next) => {
 
 exports.deleteRestaurant = async (req, res, next) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid restaurant id" });
+    }
+
     const restaurant = await Restaurant.findById(req.params.id);
     if (!restaurant) {
       return res
