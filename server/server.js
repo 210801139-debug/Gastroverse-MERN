@@ -7,6 +7,8 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const { apiLimiter } = require("./middleware/rateLimiters");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swagger");
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 if (!process.env.MONGO_URI) {
@@ -73,6 +75,16 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "10kb" }));
+
+// Swagger API docs
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  explorer: true,
+  customSiteTitle: "Gastroverse API Docs",
+}));
+app.get("/api-docs.json", (_req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerSpec);
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
