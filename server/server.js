@@ -76,12 +76,58 @@ app.use(
 );
 app.use(express.json({ limit: "10kb" }));
 
+// Protect Swagger docs with basic auth in production
+const swaggerAuth = (req, res, next) => {
+  // Keep docs open in non-production environments
+  if (process.env.NODE_ENV !== "production") {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || "";
+  const [scheme, encoded] = authHeader.split(" ");
+
+  if (scheme !== "Basic" || !encoded) {
+    res.set("WWW-Authenticate", 'Basic realm="API Docs"');
+    return res.status(401).send("Authentication required");
+  }
+
+  let decoded;
+  try {
+    decoded = Buffer.from(encoded, "base64").toString("utf8");
+  } catch (_err) {
+    res.set("WWW-Authenticate", 'Basic realm="API Docs"');
+    return res.status(401).send("Invalid authentication header");
+  }
+
+  const [user, pass] = decoded.split(":");
+  const expectedUser = process.env.SWAGGER_USER;
+  const expectedPass = process.env.SWAGGER_PASSWORD;
+
+  if (!expectedUser || !expectedPass) {
+    return res
+      .status(500)
+      .send("Swagger credentials are not configured on the server");
+  }
+
+  if (user === expectedUser && pass === expectedPass) {
+    return next();
+  }
+
+  res.set("WWW-Authenticate", 'Basic realm="API Docs"');
+  return res.status(401).send("Invalid credentials");
+};
+
 // Swagger API docs
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  explorer: true,
-  customSiteTitle: "Gastroverse API Docs",
-}));
-app.get("/api-docs.json", (_req, res) => {
+app.use(
+  "/api-docs",
+  swaggerAuth,
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customSiteTitle: "Gastroverse API Docs",
+  }),
+);
+app.get("/api-docs.json", swaggerAuth, (_req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.send(swaggerSpec);
 });
