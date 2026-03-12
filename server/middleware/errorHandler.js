@@ -1,6 +1,8 @@
 const { logSecurityEvent } = require("../utils/securityLogger");
+const logger = require("../utils/logger");
 
 const notFound = (req, res) => {
+  logger.error("Route not found", { method: req.method, url: req.originalUrl });
   res.status(404).json({
     success: false,
     message: `Route not found: ${req.originalUrl}`,
@@ -29,9 +31,21 @@ const errorHandler = (err, req, res, _next) => {
   }
 
   if (statusCode >= 500) {
+    logger.exception("Server error handled", {
+      statusCode,
+      errorName: err.name,
+      message: err.message,
+      stack: err.stack,
+    });
     logSecurityEvent("server_error", req, {
       statusCode,
       errorName: err.name,
+    });
+  } else {
+    logger.error("Client error handled", {
+      statusCode,
+      errorName: err.name,
+      message,
     });
   }
 

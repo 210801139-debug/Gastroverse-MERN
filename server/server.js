@@ -9,6 +9,7 @@ const { apiLimiter } = require("./middleware/rateLimiters");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger");
+const logger = require("./utils/logger");
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });
 if (!process.env.MONGO_URI) {
@@ -43,7 +44,7 @@ const validateSecurityConfig = () => {
   }
 
   if (weakSecret) {
-    console.warn(
+    logger.error(
       "[SECURITY_WARNING] JWT_SECRET appears weak. Replace with random >= 32 chars",
     );
   }
@@ -74,7 +75,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   }),
 );
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "16mb" }));
 
 // Protect Swagger docs with basic auth in production
 const swaggerAuth = (req, res, next) => {
@@ -151,15 +152,18 @@ const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    logger.info(`Server running on port ${PORT}`);
   });
 });
 
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
+  logger.exception("Unhandled Rejection", { reason: String(reason) });
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error.message);
+  logger.exception("Uncaught Exception", {
+    error: error.message,
+    stack: error.stack,
+  });
   process.exit(1);
 });

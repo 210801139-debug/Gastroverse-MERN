@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const path = require("path");
 const dotenv = require("dotenv");
+const logger = require("../utils/logger");
 
 // Support .env in either server/.env or project-root/.env
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -23,7 +24,7 @@ const connectDB = async () => {
     const conn = await mongoose.connect(primaryUri, {
       serverSelectionTimeoutMS: 8000,
     });
-    console.log(`MongoDB connected: ${conn.connection.host}`);
+    logger.info(`MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
     // If running locally, Docker DNS name "mongo" is not resolvable.
     if (error.code === "ENOTFOUND" && primaryUri.includes("://mongo:")) {
@@ -35,18 +36,14 @@ const connectDB = async () => {
         const conn = await mongoose.connect(fallbackUri, {
           serverSelectionTimeoutMS: 8000,
         });
-        console.log(
-          `MongoDB connected via localhost fallback: ${conn.connection.host}`,
-        );
+        logger.info(`MongoDB connected via localhost fallback: ${conn.connection.host}`);
         return;
       } catch (fallbackError) {
-        console.error(
-          `MongoDB fallback connection error: ${fallbackError.message}`,
-        );
+        logger.error(`MongoDB fallback connection error: ${fallbackError.message}`);
       }
     }
 
-    console.error(`MongoDB connection error: ${error.message}`);
+    logger.error(`MongoDB connection error: ${error.message}`);
     process.exit(1);
   }
 };
