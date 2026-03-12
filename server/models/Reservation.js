@@ -33,7 +33,7 @@ const reservationSchema = new mongoose.Schema(
     },
     notes: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Reservation", reservationSchema);

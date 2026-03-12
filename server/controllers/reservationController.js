@@ -26,13 +26,19 @@ exports.getRestaurantReservations = async (req, res, next) => {
   try {
     const restaurant = await Restaurant.findById(req.params.restaurantId);
     if (!restaurant) {
-      return res.status(404).json({ success: false, message: "Restaurant not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Restaurant not found" });
     }
     if (restaurant.owner.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
-    const reservations = await Reservation.find({ restaurant: req.params.restaurantId })
+    const reservations = await Reservation.find({
+      restaurant: req.params.restaurantId,
+    })
       .populate("customer", "name email phone")
       .sort("-date");
     res.json({ success: true, data: reservations });
@@ -43,12 +49,18 @@ exports.getRestaurantReservations = async (req, res, next) => {
 
 exports.updateReservationStatus = async (req, res, next) => {
   try {
-    const reservation = await Reservation.findById(req.params.id).populate("restaurant");
+    const reservation = await Reservation.findById(req.params.id).populate(
+      "restaurant",
+    );
     if (!reservation) {
-      return res.status(404).json({ success: false, message: "Reservation not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Reservation not found" });
     }
     if (reservation.restaurant.owner.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Not authorized" });
     }
 
     reservation.status = req.body.status;
